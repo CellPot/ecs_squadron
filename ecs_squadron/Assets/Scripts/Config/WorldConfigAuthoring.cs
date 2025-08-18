@@ -7,6 +7,11 @@ namespace Config
     {
         public GameObject PlayerPrefab;
         public GameObject EnemyPrefab;
+        public float ShipSpawnMinRadius = 15f;
+        public float ShipSpawnMaxRadius = 30f;
+        public int MaxShipCount = 30;
+        public int WaveSize = 5;
+        public float WaveCooldown = 3;
 
         class Baker : Baker<WorldConfigAuthoring>
         {
@@ -17,7 +22,15 @@ namespace Config
                 AddComponent(entity, new WorldConfig
                 {
                     PlayerPrefab = GetEntity(authoring.PlayerPrefab, TransformUsageFlags.Dynamic),
-                    EnemyPrefab = GetEntity(authoring.EnemyPrefab, TransformUsageFlags.Dynamic),
+                    EnemyConfig = new EnemyConfig()
+                    {
+                        EnemyPrefab = GetEntity(authoring.EnemyPrefab, TransformUsageFlags.Dynamic),
+                        ShipSpawnMinRadius = authoring.ShipSpawnMinRadius,
+                        ShipSpawnMaxRadius = authoring.ShipSpawnMaxRadius,
+                        MaxShipCount = authoring.MaxShipCount,
+                        WaveSize = authoring.WaveSize,
+                        WaveCooldown = authoring.WaveCooldown,
+                    }
                 });
             }
         }

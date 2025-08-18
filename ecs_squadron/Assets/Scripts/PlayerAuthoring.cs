@@ -44,8 +44,8 @@ public partial struct PlayerSpawnerSystem : ISystem
     public void OnUpdate(ref SystemState state)
     {
         state.Enabled = false;
-        var config = SystemAPI.GetSingleton<WorldConfig>();
-        var player = state.EntityManager.Instantiate(config.PlayerPrefab);
+        WorldConfig config = SystemAPI.GetSingleton<WorldConfig>();
+        Entity player = state.EntityManager.Instantiate(config.PlayerPrefab);
     }
 }
 
@@ -54,22 +54,46 @@ public partial struct PlayerSpawnerSystem : ISystem
 [UpdateBefore(typeof(TransformSystemGroup))]
 public partial struct EnemySpawnerSystem : ISystem
 {
+    private EntityQuery _enemyQuery;
+    private uint _lastSpawnTime;
+    private bool _initialSpawnComplete;
+
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<WorldConfig>();
         state.RequireForUpdate<PlayerTag>();
+        _enemyQuery = new EntityQueryBuilder(Allocator.Temp)
+            .WithAny<Ship>()
+            .WithNone<PlayerTag>()
+            .Build(ref state);
     }
 
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        state.Enabled = false;
-        
-        var config = SystemAPI.GetSingleton<WorldConfig>();
-        var ecb = new EntityCommandBuffer(Allocator.Temp);
-        var random = Random.CreateFromIndex(1234);
-        
+        WorldConfig config = SystemAPI.GetSingleton<WorldConfig>();
+        int currentEnemyCount = _enemyQuery.CalculateEntityCount();
+
+        if (currentEnemyCount >= config.EnemyConfig.MaxShipCount)
+        {
+            _initialSpawnComplete = true;
+            return;
+        }
+
+        float currentTime = (float)SystemAPI.Time.ElapsedTime;
+        if (!_initialSpawnComplete || currentTime - _lastSpawnTime >= config.EnemyConfig.WaveCooldown)
+        {
+            SpawnEnemies(ref state, currentEnemyCount, currentTime, config.EnemyConfig);
+            _initialSpawnComplete = true;
+            _lastSpawnTime = (uint)currentTime;
+        }
+    }
+
+    [BurstCompile]
+    private void SpawnEnemies(ref SystemState state, int currentEnemyCount, float currentTime,
+        EnemyConfig config)
+    {
         float3 playerPos = float3.zero;
         foreach (var playerTransform in SystemAPI.Query<RefRO<LocalTransform>>().WithAll<PlayerTag>())
         {
@@ -77,21 +101,21 @@ public partial struct EnemySpawnerSystem : ISystem
             break;
         }
 
-        int enemyCount = 10; 
-        float minRadius = 15f; 
-        float maxRadius = 30f; 
-        
-        for (int i = 0; i < enemyCount; i++)
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.Temp);
+        Random random = Random.CreateFromIndex(1234); //Random.CreateFromIndex((uint)(currentTime * 1000));
+        int enemiesToSpawn = math.min(config.MaxShipCount - currentEnemyCount, config.WaveSize);
+
+        for (int i = 0; i < enemiesToSpawn; i++)
         {
             float angle = random.NextFloat(0, 2 * math.PI);
-            float distance = random.NextFloat(minRadius, maxRadius);
-            
+            float distance = random.NextFloat(config.ShipSpawnMinRadius, config.ShipSpawnMaxRadius);
+
             float3 spawnPos = new float3(
                 playerPos.x + math.cos(angle) * distance,
                 playerPos.z + math.sin(angle) * distance,
                 0f
             );
-            
+
             Entity enemy = ecb.Instantiate(config.EnemyPrefab);
             ecb.SetComponent(enemy, new LocalTransform
             {
