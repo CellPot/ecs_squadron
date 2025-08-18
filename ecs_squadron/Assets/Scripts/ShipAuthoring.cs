@@ -5,7 +5,7 @@ using UnityEngine;
 public class ShipAuthoring : MonoBehaviour
 {
     public float MoveSpeed = 10;
-    // public float RotationSpeed = 10;
+    public float EffectiveDistance = 2;
 
     class Baker : Baker<ShipAuthoring>
     {
@@ -16,21 +16,21 @@ public class ShipAuthoring : MonoBehaviour
             AddComponent(entity, new Ship()
             {
                 MoveSpeed = authoring.MoveSpeed,
-                // RotationSpeed = authoring.RotationSpeed
+                EffectiveDistance = authoring.EffectiveDistance,
             });
             AddComponent(entity, new ShipMovement());
         }
     }
 }
 
+
 public struct Ship : IComponentData
 {
     public float MoveSpeed;
-    // public float RotationSpeed;
+    public float EffectiveDistance;
 }
 
 public struct ShipMovement : IComponentData
 {
     public float3 LinearVelocity;
-    // public float AngularVelocity;
 }

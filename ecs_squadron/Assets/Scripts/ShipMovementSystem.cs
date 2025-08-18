@@ -23,9 +23,6 @@ public partial struct ShipMovementSystem : ISystem
                          RefRW<ShipMovement>,
                          RefRO<Ship>>())
         {
-            // transform.ValueRW = transform.ValueRO.RotateZ(
-            //     shipMovement.ValueRO.AngularVelocity * deltaTime * ship.ValueRO.RotationSpeed
-            // );
             transform.ValueRW.Position = transform.ValueRO.Position +
                                          shipMovement.ValueRO.LinearVelocity * ship.ValueRO.MoveSpeed * deltaTime;
         }
@@ -67,7 +64,6 @@ public partial struct PlayerInputSystem : ISystem
             }
 
             shipMovement.ValueRW.LinearVelocity = inputDirection;
-            // shipMovement.ValueRW.AngularVelocity = input.ValueRO.RotateAxis;
         }
     }
 }
@@ -112,7 +108,19 @@ public partial struct AIShipSystem : ISystem
                 if (distanceToPlayer > 0.001f)
                 {
                     float3 moveDirection = math.normalize(directionToPlayer);
-                    movement.ValueRW.LinearVelocity = moveDirection;
+                    if (distanceToPlayer < ship.ValueRO.EffectiveDistance)
+                    {
+                        movement.ValueRW.LinearVelocity = -moveDirection;
+                    }
+                    else if (distanceToPlayer >
+                             ship.ValueRO.EffectiveDistance * 1.1f)
+                    {
+                        movement.ValueRW.LinearVelocity = moveDirection;
+                    }
+                    else
+                    {
+                        movement.ValueRW.LinearVelocity = float3.zero;
+                    }
                 }
                 else
                 {
