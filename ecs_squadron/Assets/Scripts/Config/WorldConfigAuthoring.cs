@@ -5,13 +5,32 @@ namespace Config
 {
     public class WorldConfigAuthoring : MonoBehaviour
     {
+        [Header("Prefabs")] 
         public GameObject PlayerPrefab;
         public GameObject EnemyPrefab;
+
+        [Header("Enemy Spawning")] 
         public float ShipSpawnMinRadius = 15f;
         public float ShipSpawnMaxRadius = 30f;
         public int MaxShipCount = 30;
         public int WaveSize = 5;
         public float WaveCooldown = 3;
+
+        [Header("Boid Behavior")] 
+        [Tooltip("How far ships look for neighbors for alignment and cohesion")]
+        public float NeighborRadius = 8f;
+        [Tooltip("How close is too close for separation behavior")]
+        public float SeparationRadius = 3f;
+        [Tooltip("How strongly ships align with neighbors")]
+        public float AlignmentWeight = 1.2f;
+        [Tooltip("How strongly ships move toward the group center")]
+        public float CohesionWeight = 1.0f;
+        [Tooltip("How strongly ships avoid crowding")]
+        public float SeparationWeight = 2.0f;
+        [Tooltip("How strongly ships are attracted to the player")]
+        public float TargetSeekWeight = 1.5f;
+        [Tooltip("Maximum steering force to prevent erratic movement")]
+        public float MaxSteerForce = 5f;
 
         class Baker : Baker<WorldConfigAuthoring>
         {
@@ -30,6 +49,16 @@ namespace Config
                         MaxShipCount = authoring.MaxShipCount,
                         WaveSize = authoring.WaveSize,
                         WaveCooldown = authoring.WaveCooldown,
+                    },
+                    BoidConfig = new BoidConfig()
+                    {
+                        NeighborRadius = authoring.NeighborRadius,
+                        SeparationRadius = authoring.SeparationRadius,
+                        AlignmentWeight = authoring.AlignmentWeight,
+                        CohesionWeight = authoring.CohesionWeight,
+                        SeparationWeight = authoring.SeparationWeight,
+                        TargetSeekWeight = authoring.TargetSeekWeight,
+                        MaxSteerForce = authoring.MaxSteerForce,
                     }
                 });
             }

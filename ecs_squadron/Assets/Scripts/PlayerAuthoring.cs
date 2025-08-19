@@ -50,7 +50,6 @@ public partial struct PlayerSpawnerSystem : ISystem
 }
 
 [BurstCompile]
-[UpdateBefore(typeof(PlayerSpawnerSystem))]
 [UpdateBefore(typeof(TransformSystemGroup))]
 public partial struct EnemySpawnerSystem : ISystem
 {

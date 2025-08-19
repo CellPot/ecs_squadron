@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Unity.Entities;
 
 namespace Config
@@ -6,6 +7,7 @@ namespace Config
     {
         public Entity PlayerPrefab;
         public EnemyConfig EnemyConfig;
+        public BoidConfig BoidConfig;
     }
 
     public struct EnemyConfig
@@ -16,5 +18,16 @@ namespace Config
         public int MaxShipCount;
         public int WaveSize;
         public float WaveCooldown;
+    }
+
+    public struct BoidConfig
+    {
+        public float NeighborRadius;
+        public float SeparationRadius;
+        public float AlignmentWeight;
+        public float CohesionWeight;
+        public float SeparationWeight;
+        public float TargetSeekWeight;
+        public float MaxSteerForce;
     }
 }

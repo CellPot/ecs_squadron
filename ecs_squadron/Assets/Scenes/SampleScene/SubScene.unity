@@ -150,6 +150,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   PlayerPrefab: {fileID: 5390125819679888457, guid: 425f45bb30dd30542a1043de1618f317, type: 3}
   EnemyPrefab: {fileID: 8135419226992092765, guid: 949b7f2ada1b21848ada24fcea136a85, type: 3}
+  ShipSpawnMinRadius: 15
+  ShipSpawnMaxRadius: 30
+  MaxShipCount: 30
+  WaveSize: 5
+  WaveCooldown: 3
+  NeighborRadius: 6
+  SeparationRadius: 3.5
+  AlignmentWeight: 0.3
+  CohesionWeight: 0.1
+  SeparationWeight: 3
+  TargetSeekWeight: 2
+  MaxSteerForce: 0.01
 --- !u!4 &1323696285
 Transform:
   m_ObjectHideFlags: 0
