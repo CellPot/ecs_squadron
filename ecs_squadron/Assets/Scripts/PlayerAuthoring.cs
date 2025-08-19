@@ -112,7 +112,7 @@ public partial struct EnemySpawnerSystem : ISystem
 
             float3 spawnPos = new float3(
                 playerPos.x + math.cos(angle) * distance,
-                playerPos.z + math.sin(angle) * distance,
+                playerPos.y + math.sin(angle) * distance,
                 0f
             );
 
