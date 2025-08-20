@@ -1,3 +1,4 @@
+using Boids;
 using Unity.Entities;
 using UnityEngine;
 
