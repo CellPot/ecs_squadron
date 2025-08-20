@@ -166,6 +166,9 @@ MonoBehaviour:
   TargetSlowRadius: 7
   TargetStopRadius: 5
   ObstacleAvoidanceWeight: 6
+  ProjectilePrefab: {fileID: 5012494121026762286, guid: b3654a931cf0c5d4e8708e39b2924117, type: 3}
+  ProjectileSpeed: 3
+  ProjectileLifetime: 6
 --- !u!4 &1323696285
 Transform:
   m_ObjectHideFlags: 0

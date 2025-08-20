@@ -8,6 +8,7 @@ namespace Config
         public Entity PlayerPrefab;
         public EnemyConfig EnemyConfig;
         public BoidConfig BoidConfig;
+        public CombatConfig CombatConfig;
     }
 
     public struct EnemyConfig
@@ -18,5 +19,11 @@ namespace Config
         public int MaxShipCount;
         public int WaveSize;
         public float WaveCooldown;
+    }
+    
+    public struct CombatConfig
+    {
+        public float ProjectileSpeed;
+        public float ProjectileLifetime;
     }
 }

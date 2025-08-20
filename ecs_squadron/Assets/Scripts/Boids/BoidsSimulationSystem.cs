@@ -329,7 +329,8 @@ namespace Boids
             [ReadOnly] public NativeArray<float3> NewVelocities;
 
             //Only accessing by the current index, so it's ok for parallel
-            [NativeDisableParallelForRestriction] public ComponentLookup<ShipMovement> MovementLookup;
+            [NativeDisableParallelForRestriction] 
+            public ComponentLookup<ShipMovement> MovementLookup;
 
             public void Execute(int index)
             {

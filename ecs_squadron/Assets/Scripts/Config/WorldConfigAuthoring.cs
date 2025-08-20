@@ -6,40 +6,52 @@ namespace Config
 {
     public class WorldConfigAuthoring : MonoBehaviour
     {
-        [Header("Prefabs")] 
-        public GameObject PlayerPrefab;
+        [Header("Prefabs")] public GameObject PlayerPrefab;
         public GameObject EnemyPrefab;
 
-        [Header("Enemy Spawning")] 
-        public float ShipSpawnMinRadius = 15f;
+        [Header("Enemy Spawning")] public float ShipSpawnMinRadius = 15f;
         public float ShipSpawnMaxRadius = 30f;
         public int MaxShipCount = 30;
         public int WaveSize = 5;
         public float WaveCooldown = 3;
 
-        [Header("Boid Behavior")] 
+        [Header("Boid Behavior")]
         [Tooltip("The size of cell, in which ships search neighbors for alignment and cohesion")]
         public float CellSize = 6f;
+
         [Tooltip("How many cells at each side is checked around current cell for neighbours: 1 = search grid [3x3]")]
         public int CellCheckRadius = 1;
+
         [Tooltip("How close is too close for separation behavior")]
         public float SeparationRadius = 3f;
+
         [Tooltip("How strongly ships align with neighbors")]
         public float AlignmentWeight = 1.2f;
+
         [Tooltip("How strongly ships move toward the group center")]
         public float CohesionWeight = 1.0f;
+
         [Tooltip("How strongly ships avoid crowding")]
         public float SeparationWeight = 2.0f;
+
         [Tooltip("How strongly ships are attracted to the player")]
         public float TargetSeekWeight = 1.5f;
+
         [Tooltip("Maximum steering force to prevent erratic movement")]
         public float MaxSteerForce = 5f;
+
         [Tooltip("Distance at which target seeking velocity will start diminishing")]
         public float TargetSlowRadius = 6f;
+
         [Tooltip("Distance at which target seeking velocity will be reverted")]
-        public float TargetStopRadius = 4f;        
+        public float TargetStopRadius = 4f;
+
         [Tooltip("How much ships will try to avoid player")]
         public float ObstacleAvoidanceWeight = 4f;
+
+        [Header("Combat")]
+        public float ProjectileSpeed = 20f;
+        public float ProjectileLifetime = 5f;
 
         class Baker : Baker<WorldConfigAuthoring>
         {
@@ -72,6 +84,11 @@ namespace Config
                         TargetSlowRadius = authoring.TargetSlowRadius,
                         TargetStopRadius = authoring.TargetStopRadius,
                         ObstacleAvoidanceWeight = authoring.ObstacleAvoidanceWeight,
+                    },
+                    CombatConfig = new CombatConfig()
+                    {
+                        ProjectileSpeed = authoring.ProjectileSpeed,
+                        ProjectileLifetime = authoring.ProjectileLifetime,
                     }
                 });
             }
