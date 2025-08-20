@@ -10,5 +10,8 @@ namespace Boids
         public float SeparationWeight;
         public float TargetSeekWeight;
         public float MaxSteerForce;
+        public float TargetStopRadius;
+        public float TargetSlowRadius;
+        public float ObstacleAvoidanceWeight;
     }
 }

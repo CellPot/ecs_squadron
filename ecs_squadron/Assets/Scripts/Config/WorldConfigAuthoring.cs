@@ -34,6 +34,12 @@ namespace Config
         public float TargetSeekWeight = 1.5f;
         [Tooltip("Maximum steering force to prevent erratic movement")]
         public float MaxSteerForce = 5f;
+        [Tooltip("Distance at which target seeking velocity will start diminishing")]
+        public float TargetSlowRadius = 6f;
+        [Tooltip("Distance at which target seeking velocity will be reverted")]
+        public float TargetStopRadius = 4f;        
+        [Tooltip("How much ships will try to avoid player")]
+        public float ObstacleAvoidanceWeight = 4f;
 
         class Baker : Baker<WorldConfigAuthoring>
         {
@@ -63,6 +69,9 @@ namespace Config
                         SeparationWeight = authoring.SeparationWeight,
                         TargetSeekWeight = authoring.TargetSeekWeight,
                         MaxSteerForce = authoring.MaxSteerForce,
+                        TargetSlowRadius = authoring.TargetSlowRadius,
+                        TargetStopRadius = authoring.TargetStopRadius,
+                        ObstacleAvoidanceWeight = authoring.ObstacleAvoidanceWeight,
                     }
                 });
             }

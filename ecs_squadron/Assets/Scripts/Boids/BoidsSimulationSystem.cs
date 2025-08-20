@@ -174,10 +174,26 @@ namespace Boids
                 float3 targetSeek = float3.zero;
                 if (HasTarget)
                 {
-                    float3 toPlayer = TargetPosition - currentPosition;
-                    if (math.lengthsq(toPlayer) > 0.001f)
+                    float3 toTarget = TargetPosition - currentPosition;
+                    float distanceSq = math.lengthsq(toTarget);
+
+                    float stopRadiusSq = BoidConfig.TargetStopRadius * BoidConfig.TargetStopRadius;
+                    float slowRadiusSq = BoidConfig.TargetSlowRadius * BoidConfig.TargetSlowRadius;
+
+                    if (distanceSq > slowRadiusSq)
                     {
-                        targetSeek = BoidConfig.TargetSeekWeight * math.normalizesafe(toPlayer);
+                        targetSeek = math.normalizesafe(toTarget) * BoidConfig.TargetSeekWeight;
+                    }
+                    else if (distanceSq > stopRadiusSq)
+                    {
+                        float distance = math.sqrt(distanceSq);
+                        float slowFactor = (distance - BoidConfig.TargetStopRadius) /
+                                           (BoidConfig.TargetSlowRadius - BoidConfig.TargetStopRadius);
+                        targetSeek = math.normalizesafe(toTarget) * BoidConfig.TargetSeekWeight * slowFactor;
+                    }
+                    else if (distanceSq > 0.000001f)
+                    {
+                        targetSeek = -math.normalizesafe(toTarget) * BoidConfig.ObstacleAvoidanceWeight;
                     }
                 }
 
