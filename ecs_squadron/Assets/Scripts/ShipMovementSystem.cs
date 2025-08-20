@@ -67,7 +67,7 @@ public partial struct PlayerInputSystem : ISystem
 
 [BurstCompile]
 [UpdateInGroup(typeof(InitializationSystemGroup))]
-public partial struct AIShipSystem : ISystem
+public partial struct BoidsSimulationSystem : ISystem
 {
     [BurstCompile]
     public void OnCreate(ref SystemState state)
@@ -108,6 +108,10 @@ public partial struct AIShipSystem : ISystem
             CollectionHelper.CreateNativeArray<Entity, RewindableAllocator>(shipCount, ref world.UpdateAllocator);
         var shipMaxSpeeds =
             CollectionHelper.CreateNativeArray<float, RewindableAllocator>(shipCount, ref world.UpdateAllocator);
+
+        var shipNewVelocities =
+            CollectionHelper.CreateNativeArray<float3, RewindableAllocator>(shipCount, ref world.UpdateAllocator);
+
         var spatialHashMap = new NativeParallelMultiHashMap<int, int>(shipCount, world.UpdateAllocator.ToAllocator);
 
         var gatherDataJob = new GatherShipDataJob
@@ -124,18 +128,45 @@ public partial struct AIShipSystem : ISystem
         var boidJob = new CalculateBoidForcesJob
         {
             Positions = shipPositions,
-            Velocities = shipVelocities,
-            Entities = shipEntities,
+            InputVelocities = shipVelocities,
             MaxSpeeds = shipMaxSpeeds,
             SpatialHashMap = spatialHashMap,
             BoidConfig = boidConfig,
             TargetPosition = playerPosition,
             HasTarget = hasPlayer,
-            MovementLookup = SystemAPI.GetComponentLookup<ShipMovement>(false),
+            OutputVelocities = shipNewVelocities,
         };
         var boidHandle = boidJob.Schedule(shipCount, 32, gatherHandle);
 
-        state.Dependency = boidHandle;
+        var applyJob = new ApplyNewVelocitiesJob
+        {
+            NewVelocities = shipNewVelocities,
+            Entities = shipEntities,
+            MovementLookup = SystemAPI.GetComponentLookup<ShipMovement>(false),
+        };
+
+        var applyHandle = applyJob.Schedule(shipCount, 32, boidHandle);
+
+
+        state.Dependency = applyHandle;
+    }
+
+    [BurstCompile]
+    struct ApplyNewVelocitiesJob : IJobParallelFor
+    {
+        [ReadOnly] public NativeArray<Entity> Entities;
+        [ReadOnly] public NativeArray<float3> NewVelocities;
+
+        //Only accessing by the current index, so it's ok for parallel
+        [NativeDisableParallelForRestriction] public ComponentLookup<ShipMovement> MovementLookup;
+
+        public void Execute(int index)
+        {
+            var entity = Entities[index];
+            var movement = MovementLookup[entity];
+            movement.LinearVelocity = NewVelocities[index];
+            MovementLookup[entity] = movement;
+        }
     }
 
     [BurstCompile]
@@ -168,8 +199,7 @@ public partial struct AIShipSystem : ISystem
     struct CalculateBoidForcesJob : IJobParallelFor
     {
         [ReadOnly] public NativeArray<float3> Positions;
-        [ReadOnly] public NativeArray<float3> Velocities;
-        [ReadOnly] public NativeArray<Entity> Entities;
+        [ReadOnly] public NativeArray<float3> InputVelocities;
         [ReadOnly] public NativeArray<float> MaxSpeeds;
 
         [ReadOnly] public NativeParallelMultiHashMap<int, int> SpatialHashMap;
@@ -178,14 +208,12 @@ public partial struct AIShipSystem : ISystem
         [ReadOnly] public bool HasTarget;
         [ReadOnly] public float3 TargetPosition;
 
-        //TODO: мб вместо лукапа заполнять вовне? Хотя каждый ship проверяется всегда только одним тредом
-        [NativeDisableParallelForRestriction] public ComponentLookup<ShipMovement> MovementLookup;
+        [WriteOnly] public NativeArray<float3> OutputVelocities;
 
         public void Execute(int index)
         {
             var currentPosition = Positions[index];
-            var currentVelocity = Velocities[index];
-            var currentEntity = Entities[index];
+            var currentVelocity = InputVelocities[index];
             var maxSpeed = MaxSpeeds[index];
 
             float3 separation = CalculateSeparation(currentPosition, index);
@@ -210,9 +238,7 @@ public partial struct AIShipSystem : ISystem
                 newVelocity = math.normalizesafe(newVelocity) * maxSpeed;
             }
 
-            var movement = MovementLookup[currentEntity];
-            movement.LinearVelocity = newVelocity;
-            MovementLookup[currentEntity] = movement;
+            OutputVelocities[index] = newVelocity;
         }
 
         private float3 CalculateTargetSeek(float3 currentPosition)
@@ -286,7 +312,7 @@ public partial struct AIShipSystem : ISystem
                 float distSq = math.distancesq(position, Positions[neighborIndex]);
                 if (distSq < neighborRadiusSq)
                 {
-                    velocity += Velocities[neighborIndex];
+                    velocity += InputVelocities[neighborIndex];
                     neighborCount++;
                 }
             }
@@ -343,80 +369,6 @@ public partial struct AIShipSystem : ISystem
             }
 
             return float3.zero;
-        }
-
-        // private NativeList<int> GetNearbyShipsOld(float3 position)
-        // {
-        //     var nearbyShips = new NativeList<int>(Allocator.Temp);
-        //
-        //     for (int dx = -CellCheckRadius; dx <= CellCheckRadius; dx++)
-        //     {
-        //         for (int dy = -CellCheckRadius; dy <= CellCheckRadius; dy++)
-        //         {
-        //             var offsetPos = position + new float3(dx * CellSize, dy * CellSize, 0);
-        //             var hash = SpatialHashUtils.GetSpatialHash(offsetPos, CellSize);
-        //
-        //             if (SpatialHashMap.TryGetFirstValue(hash, out int shipIndex, out var iterator))
-        //             {
-        //                 do
-        //                 {
-        //                     nearbyShips.Add(shipIndex);
-        //                 } 
-        //                 while (SpatialHashMap.TryGetNextValue(out shipIndex, ref iterator));
-        //             }
-        //         }
-        //     }
-        //
-        //     return nearbyShips;
-        // }
-
-        // private static int GetSpatialHash(float3 position, float cellSize)
-        // {
-        //     int3 gridPos = new int3(math.floor(position / cellSize));
-        //     return GetUniqueHashKey(gridPos);
-        //
-        //     int GetUniqueHashKey(int3 int3) => 
-        //         (int)math.hash(int3);
-        // }
-    }
-}
-
-[BurstCompile]
-public static class SpatialHashUtils
-{
-    [BurstCompile]
-    public static int GetSpatialHash(in float3 position, float cellSize)
-    {
-        int3 gridPos = new int3(math.floor(position / cellSize));
-        return GetUniqueHashKey(gridPos);
-
-        int GetUniqueHashKey(int3 int3) =>
-            (int)math.hash(int3);
-    }
-
-    [BurstCompile]
-    public static void AddNeighborIndexes(
-        [ReadOnly] ref NativeParallelMultiHashMap<int, int> spatialHashMap,
-        [ReadOnly] ref float3 position,
-        float cellSize,
-        int searchRadius,
-        [WriteOnly] ref NativeList<int> neighborIndexes)
-    {
-        for (int dx = -searchRadius; dx <= searchRadius; dx++)
-        {
-            for (int dy = -searchRadius; dy <= searchRadius; dy++)
-            {
-                var offsetPos = position + new float3(dx * cellSize, dy * cellSize, 0);
-                var hash = GetSpatialHash(offsetPos, cellSize);
-
-                if (spatialHashMap.TryGetFirstValue(hash, out int shipIndex, out var iterator))
-                {
-                    do
-                    {
-                        neighborIndexes.Add(shipIndex);
-                    } while (spatialHashMap.TryGetNextValue(out shipIndex, ref iterator));
-                }
-            }
         }
     }
 }
