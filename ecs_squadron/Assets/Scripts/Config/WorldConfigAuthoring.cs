@@ -17,8 +17,10 @@ namespace Config
         public float WaveCooldown = 3;
 
         [Header("Boid Behavior")] 
-        [Tooltip("How far ships look for neighbors for alignment and cohesion")]
-        public float NeighborRadius = 8f;
+        [Tooltip("The size of cell, in which ships search neighbors for alignment and cohesion")]
+        public float CellSize = 6f;
+        [Tooltip("How many cells at each side is checked around current cell for neighbours: 1 = search grid [3x3]")]
+        public int CellCheckRadius = 1;
         [Tooltip("How close is too close for separation behavior")]
         public float SeparationRadius = 3f;
         [Tooltip("How strongly ships align with neighbors")]
@@ -52,7 +54,8 @@ namespace Config
                     },
                     BoidConfig = new BoidConfig()
                     {
-                        NeighborRadius = authoring.NeighborRadius,
+                        CellSize = authoring.CellSize,
+                        CellCheckRadius = authoring.CellCheckRadius,
                         SeparationRadius = authoring.SeparationRadius,
                         AlignmentWeight = authoring.AlignmentWeight,
                         CohesionWeight = authoring.CohesionWeight,
