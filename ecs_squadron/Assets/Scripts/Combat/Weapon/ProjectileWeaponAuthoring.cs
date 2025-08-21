@@ -76,63 +76,220 @@ namespace Combat.Weapon
 
     [BurstCompile]
     [UpdateInGroup(typeof(SimulationSystemGroup))]
-    [UpdateAfter(typeof(BoidsSimulationSystem))]
     public partial struct TargetingSystem : ISystem
     {
+        public void OnCreate(ref SystemState state)
+        {
+            state.RequireForUpdate<WorldConfig>();
+        }
+
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            //TODO: алгоритм сомннительной сложности, мб обратиться вновь к хэшмапам
-            foreach (var (weapon, transform)in SystemAPI
-                         .Query<RefRW<ProjectileWeapon>, RefRO<LocalTransform>>()
-                         .WithAll<PlayerTag>())
-            {
-                Entity closestEnemy = Entity.Null;
-                float closestDistanceSq = weapon.ValueRO.AttackRange * weapon.ValueRO.AttackRange;
+            WorldConfig worldConfig = SystemAPI.GetSingleton<WorldConfig>();
 
-                foreach (var (enemyTransform, enemyEntity) in SystemAPI.Query<RefRO<LocalTransform>>()
-                             .WithEntityAccess().WithAll<Ship.Ship>().WithNone<PlayerTag>())
+            EntityQuery weaponQuery = SystemAPI.QueryBuilder()
+                .WithAll<ProjectileWeapon, LocalTransform, Faction>()
+                .Build();
+
+            EntityQuery targetableQuery = SystemAPI.QueryBuilder()
+                .WithAll<LocalTransform, Faction>()
+                .WithAny<Ship.Ship>()
+                .Build();
+
+            int weaponCount = weaponQuery.CalculateEntityCount();
+            int targetCount = targetableQuery.CalculateEntityCount();
+
+            if (weaponCount == 0 || targetCount == 0) return;
+
+            WorldUnmanaged world = state.WorldUnmanaged;
+
+            NativeArray<Entity> weaponEntities =
+                CollectionHelper.CreateNativeArray<Entity, RewindableAllocator>(weaponCount, ref world.UpdateAllocator);
+            NativeArray<float3> weaponPositions =
+                CollectionHelper.CreateNativeArray<float3, RewindableAllocator>(weaponCount, ref world.UpdateAllocator);
+            NativeArray<float> weaponRanges =
+                CollectionHelper.CreateNativeArray<float, RewindableAllocator>(weaponCount, ref world.UpdateAllocator);
+            NativeArray<int> weaponFactions =
+                CollectionHelper.CreateNativeArray<int, RewindableAllocator>(weaponCount, ref world.UpdateAllocator);
+
+            NativeArray<Entity> targetEntities =
+                CollectionHelper.CreateNativeArray<Entity, RewindableAllocator>(targetCount, ref world.UpdateAllocator);
+            NativeArray<float3> targetPositions =
+                CollectionHelper.CreateNativeArray<float3, RewindableAllocator>(targetCount, ref world.UpdateAllocator);
+            NativeArray<int> targetFactions =
+                CollectionHelper.CreateNativeArray<int, RewindableAllocator>(targetCount, ref world.UpdateAllocator);
+
+            NativeParallelMultiHashMap<int, int> targetSpatialHash =
+                new NativeParallelMultiHashMap<int, int>(targetCount, world.UpdateAllocator.ToAllocator);
+
+            NativeArray<Entity> targetResults =
+                CollectionHelper.CreateNativeArray<Entity, RewindableAllocator>(weaponCount, ref world.UpdateAllocator);
+
+            GatherWeaponDataJob gatherWeaponsJob = new GatherWeaponDataJob
+            {
+                WeaponEntities = weaponEntities,
+                WeaponPositions = weaponPositions,
+                WeaponRanges = weaponRanges,
+                WeaponFactions = weaponFactions
+            };
+            JobHandle gatherWeaponsHandle = gatherWeaponsJob.ScheduleParallel(weaponQuery, state.Dependency);
+
+            GatherTargetDataJob gatherTargetsJob = new GatherTargetDataJob
+            {
+                TargetEntities = targetEntities,
+                TargetPositions = targetPositions,
+                TargetFactions = targetFactions,
+                SpatialHash = targetSpatialHash.AsParallelWriter(),
+                CellSize = worldConfig.CombatConfig.WeaponTargetSearchCellSize,
+            };
+            JobHandle gatherTargetsHandle = gatherTargetsJob.ScheduleParallel(targetableQuery, gatherWeaponsHandle);
+
+            FindTargetsJob findTargetsJob = new FindTargetsJob
+            {
+                WeaponEntities = weaponEntities,
+                WeaponPositions = weaponPositions,
+                WeaponRanges = weaponRanges,
+                WeaponFactions = weaponFactions,
+                TargetEntities = targetEntities,
+                TargetPositions = targetPositions,
+                TargetFactions = targetFactions,
+                TargetSpatialHash = targetSpatialHash,
+                CellSize = worldConfig.CombatConfig.WeaponTargetSearchCellSize,
+                TargetResults = targetResults
+            };
+            JobHandle findTargetsHandle = findTargetsJob.Schedule(weaponCount, 32, gatherTargetsHandle);
+
+            ApplyTargetingResultsJob applyResultsJob = new ApplyTargetingResultsJob
+            {
+                WeaponEntities = weaponEntities,
+                TargetResults = targetResults,
+                WeaponLookup = SystemAPI.GetComponentLookup<ProjectileWeapon>(false)
+            };
+            JobHandle applyResultsHandle = applyResultsJob.Schedule(weaponCount, 64, findTargetsHandle);
+
+            state.Dependency = applyResultsHandle;
+        }
+
+        [BurstCompile]
+        private partial struct GatherWeaponDataJob : IJobEntity
+        {
+            public NativeArray<Entity> WeaponEntities;
+            public NativeArray<float3> WeaponPositions;
+            public NativeArray<float> WeaponRanges;
+            public NativeArray<int> WeaponFactions;
+
+            void Execute([EntityIndexInQuery] int entityIndexInQuery,
+                Entity entity,
+                in ProjectileWeapon weapon,
+                in LocalTransform transform,
+                in Faction faction)
+            {
+                WeaponEntities[entityIndexInQuery] = entity;
+                WeaponPositions[entityIndexInQuery] = transform.Position;
+                WeaponRanges[entityIndexInQuery] = weapon.AttackRange;
+                WeaponFactions[entityIndexInQuery] = faction.FactionId;
+            }
+        }
+
+        [BurstCompile]
+        private partial struct GatherTargetDataJob : IJobEntity
+        {
+            public NativeArray<Entity> TargetEntities;
+            public NativeArray<float3> TargetPositions;
+            public NativeArray<int> TargetFactions;
+            public NativeParallelMultiHashMap<int, int>.ParallelWriter SpatialHash;
+            [ReadOnly] public float CellSize;
+
+            void Execute([EntityIndexInQuery] int entityIndexInQuery,
+                Entity entity,
+                in LocalTransform transform,
+                in Faction faction)
+            {
+                TargetEntities[entityIndexInQuery] = entity;
+                TargetPositions[entityIndexInQuery] = transform.Position;
+                TargetFactions[entityIndexInQuery] = faction.FactionId;
+
+                int hash = SpatialHashUtils.GetSpatialHash(transform.Position, CellSize);
+                SpatialHash.Add(hash, entityIndexInQuery);
+            }
+        }
+
+        [BurstCompile]
+        private struct FindTargetsJob : IJobParallelFor
+        {
+            [ReadOnly] public NativeArray<Entity> WeaponEntities;
+            [ReadOnly] public NativeArray<float3> WeaponPositions;
+            [ReadOnly] public NativeArray<float> WeaponRanges;
+            [ReadOnly] public NativeArray<int> WeaponFactions;
+
+            [ReadOnly] public NativeArray<Entity> TargetEntities;
+            [ReadOnly] public NativeArray<float3> TargetPositions;
+            [ReadOnly] public NativeArray<int> TargetFactions;
+            [ReadOnly] public NativeParallelMultiHashMap<int, int> TargetSpatialHash;
+            [ReadOnly] public float CellSize;
+
+            [NativeDisableParallelForRestriction] public NativeArray<Entity> TargetResults;
+
+            public void Execute(int weaponIndex)
+            {
+                Entity weaponEntity = WeaponEntities[weaponIndex];
+                float3 weaponPos = WeaponPositions[weaponIndex];
+                float weaponRange = WeaponRanges[weaponIndex];
+                int weaponFaction = WeaponFactions[weaponIndex];
+
+                Entity closestTarget = Entity.Null;
+                float closestDistanceSq = weaponRange * weaponRange;
+
+                NativeList<int> nearbyTargetIndices = new NativeList<int>(Allocator.Temp);
+
+                //Instead of pre-defined cell radius weapon range is used
+                int searchRadius = math.max(1, (int)math.ceil(weaponRange / CellSize));
+                SpatialHashUtils.AddNeighborIndexes(ref TargetSpatialHash, ref weaponPos, CellSize, searchRadius,
+                    ref nearbyTargetIndices);
+
+                for (int i = 0; i < nearbyTargetIndices.Length; i++)
                 {
-                    float distanceSq = math.distancesq(transform.ValueRO.Position, enemyTransform.ValueRO.Position);
+                    int targetIndex = nearbyTargetIndices[i];
+                    Entity targetEntity = TargetEntities[targetIndex];
+
+                    if (targetEntity == weaponEntity)
+                        continue;
+
+                    if (TargetFactions[targetIndex] == weaponFaction)
+                        continue;
+
+                    float3 targetPos = TargetPositions[targetIndex];
+                    float distanceSq = math.distancesq(weaponPos, targetPos);
+
                     if (distanceSq < closestDistanceSq)
                     {
                         closestDistanceSq = distanceSq;
-                        closestEnemy = enemyEntity;
+                        closestTarget = targetEntity;
                     }
                 }
 
-                weapon.ValueRW.Target = closestEnemy;
+                nearbyTargetIndices.Dispose();
+                TargetResults[weaponIndex] = closestTarget;
             }
+        }
 
-            Entity playerEntity = Entity.Null;
-            float3 playerPosition = float3.zero;
+        [BurstCompile]
+        private struct ApplyTargetingResultsJob : IJobParallelFor
+        {
+            [ReadOnly] public NativeArray<Entity> WeaponEntities;
+            [ReadOnly] public NativeArray<Entity> TargetResults;
+            [NativeDisableParallelForRestriction] public ComponentLookup<ProjectileWeapon> WeaponLookup;
 
-            foreach (var (playerTransform, entity) in SystemAPI.Query<RefRO<LocalTransform>>().WithEntityAccess()
-                         .WithAll<PlayerTag>())
+            public void Execute(int index)
             {
-                playerEntity = entity;
-                playerPosition = playerTransform.ValueRO.Position;
-                break;
-            }
+                Entity weaponEntity = WeaponEntities[index];
+                Entity target = TargetResults[index];
 
-
-            //TODO: переиспользование кода выше с определением "команды" юнита
-            foreach (var (weapon, transform) in SystemAPI
-                         .Query<RefRW<ProjectileWeapon>, RefRO<LocalTransform>>()
-                         .WithAll<Ship.Ship>()
-                         .WithNone<PlayerTag>())
-            {
-                if (playerEntity != Entity.Null)
+                if (WeaponLookup.HasComponent(weaponEntity))
                 {
-                    float distanceSq = math.distancesq(transform.ValueRO.Position, playerPosition);
-                    if (distanceSq <= weapon.ValueRO.AttackRange * weapon.ValueRO.AttackRange)
-                    {
-                        weapon.ValueRW.Target = playerEntity;
-                    }
-                    else
-                    {
-                        weapon.ValueRW.Target = Entity.Null;
-                    }
+                    RefRW<ProjectileWeapon> weapon = WeaponLookup.GetRefRW(weaponEntity);
+                    weapon.ValueRW.Target = target;
                 }
             }
         }
@@ -144,12 +301,6 @@ namespace Combat.Weapon
     public partial struct ProjectileAttackSystem : ISystem
     {
         [BurstCompile]
-        public void OnCreate(ref SystemState state)
-        {
-            state.RequireForUpdate<WorldConfig>();
-        }
-
-        [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
             float currentTime = (float)SystemAPI.Time.ElapsedTime;
@@ -159,20 +310,19 @@ namespace Combat.Weapon
                          .Query<RefRW<ProjectileWeapon>, RefRO<LocalTransform>, RefRO<Faction>>()
                          .WithEntityAccess())
             {
+                if (weapon.ValueRO.Target != Entity.Null && !SystemAPI.Exists(weapon.ValueRO.Target))
+                {
+                    weapon.ValueRW.Target = Entity.Null;
+                    continue;
+                }
+
                 if (weapon.ValueRO.Target == Entity.Null)
                     continue;
 
                 if (currentTime - weapon.ValueRO.LastAttackTime < weapon.ValueRO.AttackCooldown)
                     continue;
 
-                // Есть ли смысл в проверке, или стоит обнулять таргет?
-                if (!SystemAPI.Exists(weapon.ValueRO.Target))
-                {
-                    weapon.ValueRW.Target = Entity.Null;
-                    continue;
-                }
 
-                //TODO: вероятно, достаточно обновления таргета в TargetSystem
                 LocalTransform targetTransform = SystemAPI.GetComponent<LocalTransform>(weapon.ValueRO.Target);
                 float distanceSq = math.distancesq(transform.ValueRO.Position, targetTransform.Position);
 
@@ -183,7 +333,6 @@ namespace Combat.Weapon
                 }
 
                 Entity projectile = ecb.Instantiate(weapon.ValueRO.ProjectilePrefab);
-
                 float3 direction = math.normalizesafe(targetTransform.Position - transform.ValueRO.Position);
 
                 ecb.SetComponent(projectile, new LocalTransform
@@ -218,14 +367,38 @@ namespace Combat.Weapon
 
     [BurstCompile]
     [UpdateInGroup(typeof(SimulationSystemGroup))]
-    public partial struct ProjectileSystem : ISystem
+    public partial struct ProjectileMovementSystem : ISystem
     {
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
             float deltaTime = SystemAPI.Time.DeltaTime;
 
-            //TODO: мб сбор данных вынести из систем?
+            foreach (var (transform, projectile) in SystemAPI
+                         .Query<RefRW<LocalTransform>, RefRO<Projectile>>())
+            {
+                float3 velocity = projectile.ValueRO.Direction * projectile.ValueRO.Speed * deltaTime;
+                transform.ValueRW.Position += velocity;
+            }
+        }
+    }
+
+    [BurstCompile]
+    [UpdateInGroup(typeof(SimulationSystemGroup))]
+    [UpdateAfter(typeof(ProjectileMovementSystem))]
+    public partial struct ProjectileCollisionSystem : ISystem
+    {
+        [BurstCompile]
+        public void OnCreate(ref SystemState state)
+        {
+            state.RequireForUpdate<WorldConfig>();
+        }
+
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
+        {
+            WorldConfig worldConfig = SystemAPI.GetSingleton<WorldConfig>();
+
             EntityQuery projectileQuery = SystemAPI.QueryBuilder()
                 .WithAll<Projectile, LocalTransform>()
                 .Build();
@@ -259,8 +432,6 @@ namespace Combat.Weapon
             NativeArray<int> targetFactions =
                 CollectionHelper.CreateNativeArray<int, RewindableAllocator>(targetCount, ref world.UpdateAllocator);
 
-            //Хэш для целей
-            float cellSize = 10f;
             NativeParallelMultiHashMap<int, int> targetSpatialHashMap =
                 new NativeParallelMultiHashMap<int, int>(targetCount, world.UpdateAllocator.ToAllocator);
 
@@ -272,7 +443,6 @@ namespace Combat.Weapon
                 Entities = projectileEntities,
                 Positions = projectilePositions,
                 ProjectileData = projectileData,
-                DeltaTime = deltaTime
             };
             JobHandle gatherProjectileHandle = gatherProjectileJob.ScheduleParallel(projectileQuery, state.Dependency);
 
@@ -282,7 +452,7 @@ namespace Combat.Weapon
                 Positions = targetPositions,
                 Factions = targetFactions,
                 SpatialHashMap = targetSpatialHashMap.AsParallelWriter(),
-                CellSize = cellSize
+                CellSize = worldConfig.CombatConfig.ProjectileSearchCellSize,
             };
             JobHandle gatherTargetHandle = gatherTargetJob.ScheduleParallel(targetQuery, gatherProjectileHandle);
 
@@ -296,7 +466,8 @@ namespace Combat.Weapon
                 TargetPositions = targetPositions,
                 TargetFactions = targetFactions,
                 TargetSpatialHashMap = targetSpatialHashMap,
-                CellSize = cellSize,
+                CellSize = worldConfig.CombatConfig.ProjectileSearchCellSize,
+                SearchRadius = worldConfig.CombatConfig.ProjectileCellCheckRadius,
                 HitProjectileEntities = hitProjectileEntities.AsParallelWriter(),
                 DamageEvents = damageEvents.AsParallelWriter()
             };
@@ -308,7 +479,7 @@ namespace Combat.Weapon
                 HealthLookup = SystemAPI.GetComponentLookup<Health>(false)
             };
             JobHandle applyHandle = applyJob.Schedule(collisionHandle);
-            
+
             EntityCommandBuffer destructionECB = new EntityCommandBuffer(world.UpdateAllocator.ToAllocator);
             DestroyProjectilesJob destroyJob = new DestroyProjectilesJob
             {
@@ -316,16 +487,16 @@ namespace Combat.Weapon
                 EntityCommandBuffer = destructionECB
             };
             JobHandle destroyHandle = destroyJob.Schedule(collisionHandle);
-            
+
             JobHandle combinedHandle = JobHandle.CombineDependencies(applyHandle, destroyHandle);
             combinedHandle.Complete();
-            
+
             destructionECB.Playback(state.EntityManager);
             destructionECB.Dispose();
-            
-            state.Dependency = applyHandle;
+
+            state.Dependency = combinedHandle;
         }
-        
+
         [BurstCompile]
         private struct DestroyProjectilesJob : IJob
         {
@@ -347,17 +518,12 @@ namespace Combat.Weapon
             public NativeArray<Entity> Entities;
             public NativeArray<float3> Positions;
             public NativeArray<Projectile> ProjectileData;
-            [ReadOnly] public float DeltaTime;
 
             void Execute([EntityIndexInQuery] int entityIndexInQuery,
                 Entity entity,
                 ref LocalTransform transform,
                 in Projectile projectile)
             {
-                //TODO: вообще другая джоба
-                float3 velocity = projectile.Direction * projectile.Speed * DeltaTime;
-                transform.Position += velocity;
-
                 Entities[entityIndexInQuery] = entity;
                 Positions[entityIndexInQuery] = transform.Position;
                 ProjectileData[entityIndexInQuery] = projectile;
@@ -399,6 +565,7 @@ namespace Combat.Weapon
             [ReadOnly] public NativeArray<int> TargetFactions;
             [ReadOnly] public NativeParallelMultiHashMap<int, int> TargetSpatialHashMap;
             [ReadOnly] public float CellSize;
+            [ReadOnly] public int SearchRadius;
 
             public NativeQueue<Entity>.ParallelWriter HitProjectileEntities;
             public NativeQueue<DamageEvent>.ParallelWriter DamageEvents;
@@ -410,7 +577,7 @@ namespace Combat.Weapon
                 Projectile projectile = ProjectileData[projectileIndex];
 
                 NativeList<int> nearbyTargets = new NativeList<int>(Allocator.Temp);
-                SpatialHashUtils.AddNeighborIndexes(ref TargetSpatialHashMap, ref projectilePos, CellSize, 1,
+                SpatialHashUtils.AddNeighborIndexes(ref TargetSpatialHashMap, ref projectilePos, CellSize, SearchRadius,
                     ref nearbyTargets);
 
                 for (int i = 0; i < nearbyTargets.Length; i++)
@@ -436,7 +603,7 @@ namespace Combat.Weapon
                         });
 
                         HitProjectileEntities.Enqueue(projectileEntity);
-                        break;//мб не всего одного попадание?
+                        break;
                     }
                 }
 
@@ -472,7 +639,7 @@ namespace Combat.Weapon
 
     [BurstCompile]
     [UpdateInGroup(typeof(SimulationSystemGroup))]
-    [UpdateAfter(typeof(ProjectileSystem))]
+    [UpdateAfter(typeof(ProjectileCollisionSystem))]
     public partial struct HealthSystem : ISystem
     {
         [BurstCompile]

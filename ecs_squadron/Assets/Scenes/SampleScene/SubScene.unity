@@ -158,8 +158,8 @@ MonoBehaviour:
   CellSize: 35
   CellCheckRadius: 1
   SeparationRadius: 5
-  AlignmentWeight: 1
-  CohesionWeight: 0.1
+  AlignmentWeight: 0.6
+  CohesionWeight: 0.02
   SeparationWeight: 5
   TargetSeekWeight: 4
   MaxSteerForce: 0.03

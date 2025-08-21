@@ -50,8 +50,9 @@ namespace Config
         public float ObstacleAvoidanceWeight = 4f;
 
         [Header("Combat")]
-        public float ProjectileSpeed = 20f;
-        public float ProjectileLifetime = 5f;
+        public float ProjectileSearchCellSize = 10f;
+        public int ProjectileCellCheckRadius = 1;
+        public float WeaponTargetSearchCellSize = 15f;
 
         class Baker : Baker<WorldConfigAuthoring>
         {
@@ -87,8 +88,9 @@ namespace Config
                     },
                     CombatConfig = new CombatConfig()
                     {
-                        ProjectileSpeed = authoring.ProjectileSpeed,
-                        ProjectileLifetime = authoring.ProjectileLifetime,
+                        ProjectileCellCheckRadius = authoring.ProjectileCellCheckRadius,
+                        ProjectileSearchCellSize = authoring.ProjectileSearchCellSize,
+                        WeaponTargetSearchCellSize = authoring.WeaponTargetSearchCellSize,
                     }
                 });
             }

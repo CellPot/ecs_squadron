@@ -335,9 +335,12 @@ namespace Boids
             public void Execute(int index)
             {
                 Entity entity = Entities[index];
-                ShipMovement movement = MovementLookup[entity];
-                movement.LinearVelocity = NewVelocities[index];
-                MovementLookup[entity] = movement;
+
+                if (MovementLookup.HasComponent(entity))
+                {
+                    RefRW<ShipMovement> movement = MovementLookup.GetRefRW(entity);
+                    movement.ValueRW.LinearVelocity = NewVelocities[index];
+                }
             }
         }
     }

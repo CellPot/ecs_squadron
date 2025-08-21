@@ -134,7 +134,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   MoveSpeed: 2
-  EffectiveDistance: 2
   FactionId: 1
 --- !u!114 &1599734954175327086
 MonoBehaviour:
@@ -161,9 +160,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8580f5bd3def8444797fadce8db77ddc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  AttackRange: 10
+  AttackRange: 11
   Damage: 5
   AttackCooldown: 4
   ProjectileLifetime: 4
   ProjectileSpeed: 5
+  ProjectileCollisionRadius: 1
   ProjectilePrefab: {fileID: 5012494121026762286, guid: b3654a931cf0c5d4e8708e39b2924117, type: 3}

@@ -23,7 +23,8 @@ namespace Config
     
     public struct CombatConfig
     {
-        public float ProjectileSpeed;
-        public float ProjectileLifetime;
+        public float ProjectileSearchCellSize;
+        public int ProjectileCellCheckRadius;
+        public float WeaponTargetSearchCellSize;
     }
 }
