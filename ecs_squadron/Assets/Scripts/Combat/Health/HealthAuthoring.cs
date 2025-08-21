@@ -1,7 +1,7 @@
 using Unity.Entities;
 using UnityEngine;
 
-namespace Combat
+namespace Combat.Health
 {
     public class HealthAuthoring : MonoBehaviour
     {
