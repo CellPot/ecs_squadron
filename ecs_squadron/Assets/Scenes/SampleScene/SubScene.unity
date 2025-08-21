@@ -155,18 +155,17 @@ MonoBehaviour:
   MaxShipCount: 64
   WaveSize: 4
   WaveCooldown: 2
-  CellSize: 6
-  CellCheckRadius: 2
+  CellSize: 35
+  CellCheckRadius: 1
   SeparationRadius: 5
   AlignmentWeight: 1
-  CohesionWeight: 0.01
+  CohesionWeight: 0.1
   SeparationWeight: 5
   TargetSeekWeight: 4
   MaxSteerForce: 0.03
-  TargetSlowRadius: 7
-  TargetStopRadius: 5
-  ObstacleAvoidanceWeight: 6
-  ProjectilePrefab: {fileID: 5012494121026762286, guid: b3654a931cf0c5d4e8708e39b2924117, type: 3}
+  TargetSlowRadius: 10
+  TargetStopRadius: 7
+  ObstacleAvoidanceWeight: 8
   ProjectileSpeed: 3
   ProjectileLifetime: 6
 --- !u!4 &1323696285

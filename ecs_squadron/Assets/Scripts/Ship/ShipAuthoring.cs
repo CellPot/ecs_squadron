@@ -7,7 +7,7 @@ namespace Ship
     public class ShipAuthoring : MonoBehaviour
     {
         public float MoveSpeed = 5;
-        public float EffectiveDistance = 3;
+        public int FactionId;
 
         class Baker : Baker<ShipAuthoring>
         {
@@ -18,18 +18,24 @@ namespace Ship
                 AddComponent(entity, new Ship()
                 {
                     MoveSpeed = authoring.MoveSpeed,
-                    EffectiveDistance = authoring.EffectiveDistance,
                 });
                 AddComponent(entity, new ShipMovement());
+                AddComponent(entity, new Faction()
+                {
+                    FactionId = authoring.FactionId,
+                });
             }
         }
     }
 
-
     public struct Ship : IComponentData
     {
         public float MoveSpeed;
-        public float EffectiveDistance;
+    }
+
+    public struct Faction : IComponentData
+    {
+        public int FactionId;
     }
 
     public struct ShipMovement : IComponentData
