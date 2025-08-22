@@ -15,3 +15,7 @@ A technical demonstration of Unity's Entity Component System through a space com
 - Spatial hash optimization for O(n) collision detection
 - Component-based data-oriented architecture
 - Parallel systems for movement, combat, and AI
+
+## Controls
+
+- **WASD** - Player movement
