@@ -166,8 +166,11 @@ MonoBehaviour:
   TargetSlowRadius: 10
   TargetStopRadius: 7
   ObstacleAvoidanceWeight: 8
-  ProjectileSpeed: 3
-  ProjectileLifetime: 6
+  ProjectileSearchCellSize: 10
+  ProjectileCellCheckRadius: 1
+  WeaponTargetSearchCellSize: 15
+  BoundaryPercent: 0.3
+  FollowSpeed: 5
 --- !u!4 &1323696285
 Transform:
   m_ObjectHideFlags: 0

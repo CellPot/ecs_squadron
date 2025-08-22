@@ -9,6 +9,7 @@ namespace Config
         public EnemyConfig EnemyConfig;
         public BoidConfig BoidConfig;
         public CombatConfig CombatConfig;
+        public CameraConfig CameraConfig;
     }
 
     public struct EnemyConfig
@@ -26,5 +27,11 @@ namespace Config
         public float ProjectileSearchCellSize;
         public int ProjectileCellCheckRadius;
         public float WeaponTargetSearchCellSize;
+    }
+
+    public struct CameraConfig
+    {
+        public float BoundaryPercent;
+        public float FollowSpeed;
     }
 }

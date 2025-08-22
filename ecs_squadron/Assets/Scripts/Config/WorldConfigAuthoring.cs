@@ -53,6 +53,11 @@ namespace Config
         public float ProjectileSearchCellSize = 10f;
         public int ProjectileCellCheckRadius = 1;
         public float WeaponTargetSearchCellSize = 15f;
+        
+        
+        [Header("Camera")]
+        public float BoundaryPercent = 0.3f;
+        public float FollowSpeed = 5f;
 
         class Baker : Baker<WorldConfigAuthoring>
         {
@@ -91,7 +96,12 @@ namespace Config
                         ProjectileCellCheckRadius = authoring.ProjectileCellCheckRadius,
                         ProjectileSearchCellSize = authoring.ProjectileSearchCellSize,
                         WeaponTargetSearchCellSize = authoring.WeaponTargetSearchCellSize,
-                    }
+                    },
+                    CameraConfig = new CameraConfig()
+                    {
+                        BoundaryPercent = authoring.BoundaryPercent,
+                        FollowSpeed = authoring.FollowSpeed,
+                    },
                 });
             }
         }

@@ -52,12 +52,12 @@ namespace Combat.Weapon.Projectile
                 Entity projectile = ecb.Instantiate(weapon.ValueRO.ProjectilePrefab);
                 float3 direction = math.normalizesafe(targetTransform.Position - transform.ValueRO.Position);
 
-                ecb.SetComponent(projectile, new LocalTransform
-                {
-                    Position = transform.ValueRO.Position + direction * 0.5f,
-                    Rotation = quaternion.LookRotationSafe(direction, math.up()),
-                    Scale = 1f
-                });
+                ecb.SetComponent(projectile, LocalTransform.FromPositionRotationScale(
+                
+                    transform.ValueRO.Position + direction * 0.5f,
+                    quaternion.LookRotationSafe(direction, math.up()),
+                    1f
+                ));
 
                 ecb.SetComponent(projectile, new Projectile
                 {
